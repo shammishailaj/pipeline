@@ -542,6 +542,11 @@ func (a *CreateUpdateNodePoolStackAction) ExecuteAction(input interface{}) (outp
 				spotPriceParam = nodePool.NodeSpotPrice
 			}
 
+			onDemandLabel := "true"
+			if spotPriceParam != "" {
+				onDemandLabel = "false"
+			}
+
 			stackParams := []*cloudformation.Parameter{
 				{
 					ParameterKey:   aws.String("KeyName"),
@@ -600,7 +605,7 @@ func (a *CreateUpdateNodePoolStackAction) ExecuteAction(input interface{}) (outp
 				},
 				{
 					ParameterKey:   aws.String("BootstrapArguments"),
-					ParameterValue: aws.String(fmt.Sprintf("--kubelet-extra-args '--node-labels pipeline-nodepool-name=%v'", nodePool.Name)),
+					ParameterValue: aws.String(fmt.Sprintf("--kubelet-extra-args '--node-labels pipeline-nodepool-name=%v,node.banzaicloud.com/ondemand=%v'", nodePool.Name, onDemandLabel)),
 				},
 			}
 
