@@ -31,6 +31,15 @@ build: ## Builds binary package
 	@go version | grep -q -E "go${GOLANG_VERSION_REGEX} " || (echo "Required Go version is ${GOLANG_VERSION}\nInstalled: `go version`" && exit 1)
 	go build -v -ldflags "-X main.Version=${VERSION} -X main.GitRev=${GITREV} -X main.BuildDate=${BUILD_DATE}" .
 
+.PHONY: debug
+debug: ## Builds binary package
+	@go version | grep -q -E "go${GOLANG_VERSION_REGEX} " || (echo "Required Go version is ${GOLANG_VERSION}\nInstalled: `go version`" && exit 1)
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -v -gcflags "-N -l" -ldflags "-X main.Version=${VERSION} -X main.GitRev=${GITREV} -X main.BuildDate=${BUILD_DATE}" -o pipeline-debug
+
+.PHONY: docker-debug
+debug-docker: debug ## Builds binary package
+	docker build -t banzaicloud/pipeline:debug -f Dockerfile.dev .
+
 .PHONY: build-ci
 build-ci:
 	CGO_ENABLED=0 GOOS=linux go build -v -ldflags "-X main.Version=${VERSION} -X main.GitRev=${GITREV} -X main.BuildDate=${BUILD_DATE}" .
