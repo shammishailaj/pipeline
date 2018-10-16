@@ -16,7 +16,6 @@ package helm
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
@@ -34,13 +33,16 @@ var tillerTunnel *kube.Tunnel
 
 //GetK8sConnection creates a new Kubernetes client
 func GetK8sConnection(kubeConfig []byte) (*kubernetes.Clientset, error) {
+	var client *kubernetes.Clientset
 	config, err := GetK8sClientConfig(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create kubernetes config failed: %v", err)
 	}
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("create kubernetes connection failed: %v", err)
+	for i := 0; i < 2; i++ {
+		client, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			return nil, fmt.Errorf("create kubernetes connection failed: %v", err)
+		}
 	}
 	return client, nil
 }
@@ -83,30 +85,22 @@ func GetK8sClientConfig(kubeConfig []byte) (*rest.Config, error) {
 
 //GetHelmClient establishes Tunnel for Helm client TODO check client and config if both needed
 func GetHelmClient(kubeConfig []byte) (*helm.Client, error) {
-	for i := 0; i < 2; i++ {
-		log.Debug("Create kubernetes Client.")
-		config, err := GetK8sClientConfig(kubeConfig)
-		if err != nil {
-			log.Debug("Could not get K8S config")
-			return nil, err
-		}
+	log.Debug("Create kubernetes Client.")
+	config, err := GetK8sClientConfig(kubeConfig)
+	if err != nil {
+		log.Debug("Could not get K8S config")
+		return nil, err
+	}
 
-		client, err := GetK8sConnection(kubeConfig)
-		if err != nil {
-			log.Debug("Could not create kubernetes client from config.")
-			return nil, fmt.Errorf("create kubernetes client failed: %v", err)
-		}
-		log.Debug("Create kubernetes Tunnel")
-		tillerTunnel, err = portforwarder.New("kube-system", client, config)
-		if err != nil {
-			if err.Error() == "Unauthorized" && i == 0 {
-				log.Errorf("create tunnel attempt %d/%d failed: %s", i+1, 2, err.Error())
-				time.Sleep(time.Millisecond * 20)
-				continue
-			}
-			return nil, fmt.Errorf("create tunnel attempt %d/%d failed: %s", i+1, 2, err.Error())
-		}
-		break
+	client, err := GetK8sConnection(kubeConfig)
+	if err != nil {
+		log.Debug("Could not create kubernetes client from config.")
+		return nil, fmt.Errorf("create kubernetes client failed: %v", err)
+	}
+	log.Debug("Create kubernetes Tunnel")
+	tillerTunnel, err = portforwarder.New("kube-system", client, config)
+	if err != nil {
+		return nil, fmt.Errorf("create tunnel failed: %v", err)
 	}
 	log.Debug("Created kubernetes tunnel on address: localhost:", tillerTunnel.Local)
 	tillerTunnelAddress := fmt.Sprintf("localhost:%d", tillerTunnel.Local)
